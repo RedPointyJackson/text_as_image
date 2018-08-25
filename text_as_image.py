@@ -30,9 +30,9 @@ import numpy as np
 from imageio import imread
 from argparse import ArgumentParser, RawTextHelpFormatter
 import sys
-from os.path import basename
 
-parser = ArgumentParser(description=__doc__, formatter_class=RawTextHelpFormatter)
+parser = ArgumentParser(description=__doc__,
+                        formatter_class=RawTextHelpFormatter)
 parser.add_argument("TEXTFILE", type=str,
                     help="Text file to use. Will use it as it is.")
 parser.add_argument("IMG", type=str,
@@ -53,9 +53,10 @@ font_v_correction_pt = args.y
 font = args.f
 text = open(args.TEXTFILE).read().strip()
 
-img = imread(args.IMG)[:, :, :3] # Discard alpha channel
+img = imread(args.IMG)[:, :, :3]  # Discard alpha channel
 
 print(args, file=sys.stderr)
+
 
 def get_width_central_figure(arr):
     """
@@ -85,8 +86,8 @@ def get_width_central_figure(arr):
 
 def measure_font(char, font, size):
     """
-    Get width and height of a `char` (str) of the `font` (str) at size `size` pt
-    (float) in pixels.
+    Get width and height of a `char` (str) of the `font` (str) at size `size`
+    pt (float) in pixels.
     """
     fig, ax = plt.subplots()
     ax.axis('off')
@@ -99,6 +100,15 @@ def measure_font(char, font, size):
     x_size_px = get_width_central_figure(np.sum(char_img[:, :, 0], axis=0))
     y_size_px = get_width_central_figure(np.sum(char_img[:, :, 0], axis=1))
     return x_size_px, y_size_px
+
+def escape(char):
+    """
+    Substitute the character for a LaTeX-safe escaped sequence.
+    """
+    subs = {'%': '\\%', '$': '\\$', '{': '\\{', '}': '\\}', '_': '\\_',
+            '#': '\\#', '&': '\\&', '<': '\\textless', '^': '\\^',
+            '\\': '\\textbackslash', '\n': ' '}
+    return subs.get(char, char)
 
 if __name__ == '__main__':
 
@@ -115,16 +125,17 @@ if __name__ == '__main__':
 
     char_idx = 0
 
-    print("Suggested preamble: ", file=sys.stderr)
-    print("    \\usepackage{fontspec}", file=sys.stderr)
-    print("    \\setmonofont{%s}" % font, file=sys.stderr)
-    print("    \\usepackage{xcolor}", file=sys.stderr)
+    print(r"\documentclass[a4paper]{report}")
+    print(r"\usepackage{xcolor}")
+    print(r"\usepackage{fontspec}")
+    print(r"\setmonofont{", font, "}", sep='')
+    print(r"\begin{document}")
 
     print("{")
     print("\\bf")
     print("\\renewcommand{\\baselinestretch}{0}")
 
-    print('\\fontsize{%dpt}{%dpt}\selectfont' % (font_pt, int(1.14*font_pt)))
+    print('\\fontsize{%dpt}{%dpt}\\selectfont' % (font_pt, int(1.14*font_pt)))
 
     for i in range(yblocks):
         for j in range(xblocks):
@@ -140,23 +151,13 @@ if __name__ == '__main__':
             g = np.median(chunk[:, :, 1])
             b = np.median(chunk[:, :, 2])
             if r == g == b == 255:
-                print("\\texttt{\\ }", end='')
+                # Don't consume a character, print a dummy in white
+                print("{\\color[RGB]{255,255,255} \\texttt{x}}", end='')
             else:
                 while not text[char_idx].isprintable():
                     char_idx += 1
                 char = text[char_idx]
-                if char == '%': char = '\\%'
-                if char == '$': char = '\\$'
-                if char == '{': char = '\\{'
-                if char == '}': char = '\\}'
-                if char == '_': char = '\\_'
-                if char == '#': char = '\\#'
-                if char == '&': char = '\\&'
-                if char == '<': char = '\\textless'
-                if char == '^': char = '\\^'
-                if char == '\\': char = '\\textbackslash'
-                if char == '\n': char = ' '
-                print("{\\color[RGB]{%d,%d,%d} \\texttt{%s}}" % (r, g, b, char), end='')
+                print("{\\color[RGB]{%d,%d,%d} \\texttt{%s}}" % (r, g, b, escape(char)), end='')
                 char_idx += 1
             print('\\hspace{%lfpt}' % font_h_correction_pt)
         print()
@@ -164,3 +165,5 @@ if __name__ == '__main__':
         print()
 
     print("}")
+
+    print(r"\end{document}")
